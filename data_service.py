@@ -15,7 +15,6 @@ class DataService:
         self._lock = threading.Lock()
         
         self.recording = False
-        self.record_start_time = None
         self.record_file_path = None
         self.record_thread = None
         self._record_lock = threading.Lock()
@@ -24,7 +23,7 @@ class DataService:
         while self._running:
             try:
                 data = self.sa.data(0)
-                logging.debug(f"Sweep data acquired: {data[:5]}...")  # log first 5 data points
+                logging.debug(f"Sweep data acquired: {data[:5]}...")
             except Exception as e:
                 logging.error(f"Error during sweep: {e}")
                 data = None
@@ -48,7 +47,7 @@ class DataService:
         with self._lock:
             return self.latest_data
 
-    def start_recording(self, record_duration=None, dest_folder="tinySA_data"):
+    def start_recording(self, record_duration=None, dest_folder="tinySA_data", record_interval=1.0):
         if not os.path.exists(dest_folder):
             os.makedirs(dest_folder)
             logging.debug(f"Created folder: {dest_folder}")
@@ -58,7 +57,6 @@ class DataService:
         
         data = self.get_latest_data()
         num_points = len(data) if data is not None else self.sa.points
-        # Use SA frequencies for header labels.
         freqs = [f"{int(f)}" for f in self.sa.frequencies]
         header = "time," + ",".join(freqs) + "\n"
         with open(self.record_file_path, "w") as f:
@@ -66,25 +64,27 @@ class DataService:
         logging.info(f"Recording started: {self.record_file_path}")
         
         self.recording = True
-        self.record_start_time = time.time()
-        self.record_thread = threading.Thread(target=self._record_loop, args=(record_duration,), daemon=True)
+        self.record_thread = threading.Thread(target=self._record_loop, args=(record_duration, record_interval), daemon=True)
         self.record_thread.start()
 
-    def _record_loop(self, record_duration):
+    def _record_loop(self, record_duration, record_interval):
+        counter = 0
         while self.recording:
-            t = time.time() - self.record_start_time
+            t = counter * record_interval  # fixed time stamp based on counter and interval
             data = self.get_latest_data()
             if data is not None:
-                row = f"{t:.2f}," + ",".join(f"{d:.2f}" for d in data) + "\n"
+                row = f"{t:.1f}," + ",".join(f"{d:.2f}" for d in data) + "\n"
                 with self._record_lock:
                     with open(self.record_file_path, "a") as f:
                         f.write(row)
-                logging.debug(f"Recorded row at {t:.2f} sec")
+                logging.debug(f"Recorded row at t={t:.1f} sec")
+            counter += 1
             if record_duration is not None and t >= record_duration:
                 self.recording = False
                 logging.info("Recording duration reached. Stopping recording.")
                 break
-            time.sleep(1)
+            time.sleep(record_interval)
+
 
     def stop_recording(self):
         self.recording = False

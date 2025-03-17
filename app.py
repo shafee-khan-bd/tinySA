@@ -112,10 +112,11 @@ plot_col, rec_col = st.columns([3, 1])
 with rec_col:
     st.subheader("Recording Controls")
     dest_folder = st.text_input("Data Folder", default_folder)
-    record_duration = st.number_input("Record Duration (sec, 0 for indefinite)", min_value=0, value=60, step=1)
+    record_duration = st.number_input("Record Duration (sec, 0 for indefinite)", min_value=0.0, value=60.0, step=0.1)
+    record_interval = st.number_input("Recording Interval (sec)", min_value=0.1, value=1.0, step=0.1)
     if st.button("Record Data"):
         duration = record_duration if record_duration > 0 else None
-        st.session_state.data_service.start_recording(record_duration=duration, dest_folder=dest_folder)
+        st.session_state.data_service.start_recording(record_duration=duration, dest_folder=dest_folder, record_interval=record_interval)
         st.session_state.recording = True
     if st.button("Stop Recording"):
         st.session_state.data_service.stop_recording()
