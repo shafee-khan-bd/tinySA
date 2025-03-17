@@ -67,10 +67,11 @@ Activate the virtual environment:
 Windows:
 
 venv\Scripts\activate
+
 macOS/Linux:
-bash
-Copy
+
 source venv/bin/activate
+
 Installing Dependencies
 Install the required packages using the provided requirements file:
 
@@ -86,10 +87,13 @@ Start the application with Streamlit:
 streamlit run app.py
 Open your browser and navigate to the URL provided by Streamlit (usually http://localhost:8501).
 
+You can also use run_app.bat file to launch the app, in case you already have python environment installed.
+
 Live Sweep Operation
 Click Start Sweep to begin displaying the live spectrum sweep data.
 Adjust the refresh rate and y-axis range (in dBm) using the sidebar sliders.
 The live sweep plot shows data across a frequency range of 50 kHz to 3.0 MHz.
+
 Recording Data
 In the Recording Controls panel on the right, set the desired data folder (default is C:\tinySA_Data on Windows or ~/tinySA_Data on other systems) and the record duration (in seconds).
 Click Record Data to start recording. During recording:
@@ -106,6 +110,7 @@ tinySA/
 ├── spectrum_analyzer.py   # Hardware communication layer for the spectrum analyzer
 ├── requirements.txt       # List of required Python packages
 └── README.md              # This documentation file
+
 Extensibility and Future Enhancements
 The application is built with a modular design that separates the hardware communication, data processing, and UI layers. Future improvements could include:
 
@@ -124,4 +129,5 @@ Fork the repository.
 Create a new branch for your feature or bug fix.
 Commit your changes and open a pull request. For major changes, please open an issue first to discuss your ideas.
 License
+
 This project is licensed under the MIT License. See the LICENSE file for details.
