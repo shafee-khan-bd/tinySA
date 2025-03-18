@@ -71,7 +71,11 @@ class DataService:
         counter = 0
         while self.recording:
             t = counter * record_interval  # fixed time stamp based on counter and interval
-            data = self.get_latest_data()
+            # Force a fresh capture directly from the SA:
+            data = self.sa.data(0)
+            # Update the latest data (so the live display can show it if needed)
+            with self._lock:
+                self.latest_data = data
             if data is not None:
                 row = f"{t:.1f}," + ",".join(f"{d:.2f}" for d in data) + "\n"
                 with self._record_lock:
@@ -84,6 +88,7 @@ class DataService:
                 logging.info("Recording duration reached. Stopping recording.")
                 break
             time.sleep(record_interval)
+
 
 
     def stop_recording(self):

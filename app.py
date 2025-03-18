@@ -54,7 +54,7 @@ st.sidebar.header("Spectrum Analyzer Settings")
 # Operating Mode (you can remove this if not needed)
 mode = st.sidebar.selectbox(
     "Operation Mode",
-    options=["Low Input", "High Input", "Low Output", "High Output", "Reference Generator"],
+    options=["Custom Input","Low Input", "High Input", "Low Output", "High Output", "Reference Generator"],
     index=0
 )
 
@@ -65,6 +65,9 @@ if mode in ["Low Input", "Low Output", "Reference Generator"]:
 elif mode in ["High Input", "High Output"]:
     default_start = 240e6
     default_stop = 960e6
+elif mode in ["Custom Input"]:
+    default_start = 50e3
+    default_stop = 3.0e6
 else:
     default_start = 100e3
     default_stop = 350e6
