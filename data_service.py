@@ -47,7 +47,7 @@ class DataService:
         with self._lock:
             return self.latest_data
 
-    def start_recording(self, record_duration=None, dest_folder="tinySA_data", record_interval=1.0):
+    def start_recording(self, record_duration=None, dest_folder="tinySA_data", record_interval=1.0, freq_range=None):
         if not os.path.exists(dest_folder):
             os.makedirs(dest_folder)
             logging.debug(f"Created folder: {dest_folder}")
@@ -56,9 +56,23 @@ class DataService:
         self.record_file_path = os.path.join(dest_folder, file_name)
         
         data = self.get_latest_data()
-        num_points = len(data) if data is not None else self.sa.points
-        freqs = [f"{int(f)}" for f in self.sa.frequencies]
-        header = "time," + ",".join(freqs) + "\n"
+        if data is not None:
+            num_points = len(data)
+        else:
+            num_points = self.sa.points
+        
+        if freq_range is not None:
+            start_freq, stop_freq = freq_range
+            freqs = [f"{int(f)}" for f in np.linspace(start_freq, stop_freq, num_points)]
+        else:
+            freqs = [f"{int(f)}" for f in self.sa.frequencies[:num_points]]
+        
+        # Save metadata (frequency range) as a comment line in the CSV header.
+        header = ""
+        if freq_range is not None:
+            header += f"# Frequency Range: {freq_range[0]} Hz to {freq_range[1]} Hz\n"
+        header += "time," + ",".join(freqs) + "\n"
+        
         with open(self.record_file_path, "w") as f:
             f.write(header)
         logging.info(f"Recording started: {self.record_file_path}")
@@ -71,9 +85,8 @@ class DataService:
         counter = 0
         while self.recording:
             t = counter * record_interval  # fixed time stamp based on counter and interval
-            # Force a fresh capture directly from the SA:
+            # Force a fresh capture for each record.
             data = self.sa.data(0)
-            # Update the latest data (so the live display can show it if needed)
             with self._lock:
                 self.latest_data = data
             if data is not None:
@@ -88,8 +101,6 @@ class DataService:
                 logging.info("Recording duration reached. Stopping recording.")
                 break
             time.sleep(record_interval)
-
-
 
     def stop_recording(self):
         self.recording = False
