@@ -87,7 +87,7 @@ if (start_freq != st.session_state.freq_settings["start"] or
     stop_freq != st.session_state.freq_settings["stop"] or 
     measurement_points != st.session_state.freq_settings["points"]):
     st.session_state.freq_settings = {"start": start_freq, "stop": stop_freq, "points": measurement_points}
-    st.session_state.data_service.sa.set_frequencies(start=start_freq, stop=stop_freq, points=measurement_points)
+    st.session_state.data_service.sa.set_frequencies(start=start_freq, stop=stop_freq)
     if mode == "Custom Input":
         st.session_state.data_service.sa.set_sweep(start_freq, stop_freq)
     st.sidebar.info(f"Sweep range updated: {start_freq} Hz to {stop_freq} Hz, Points: {measurement_points}")
