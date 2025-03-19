@@ -36,7 +36,7 @@ else:
 # =============================================================================
 st.title("TinySA Spectrum Analyzer")
 
-top_col1, top_col2 = st.columns([1,1])
+top_col1, top_col2, top_col3 = st.columns([1,1,1])
 with top_col1:
     if st.button("Start Sweep"):
         st.session_state.data_service.start_sweep()
@@ -54,39 +54,61 @@ st.sidebar.header("Spectrum Analyzer Settings")
 # Operating Mode
 mode = st.sidebar.selectbox(
     "Operation Mode",
-    options=["Custom Input","Low Input", "High Input", "Low Output", "High Output", "Reference Generator"],
+    options=["Custom Input", "Low Input", "High Input", "Low Output", "High Output", "Reference Generator"],
     index=0
 )
 
-# Set default frequency range based on mode:
+# Set default frequency range based on mode.
 if mode in ["Low Input", "Low Output", "Reference Generator"]:
     default_start = 100e3
     default_stop = 350e6
 elif mode in ["High Input", "High Output"]:
     default_start = 240e6
-    default_stop = 960e6
-elif mode in ["Custom Input"]:
+elif mode == "Custom Input":
     default_start = 50e3
-    default_stop = 3.0e6
+    default_stop = 3000000  # 3 MHz
 else:
     default_start = 100e3
     default_stop = 350e6
 
-# Instead of a fixed measurement points control, we now use the entire scan data.
-# Save frequency range in session_state.
+# Display frequency range in kHz in the UI; convert to Hz internally.
 if 'freq_settings' not in st.session_state:
-    st.session_state.freq_settings = {"start": default_start, "stop": default_stop}
-start_freq = st.sidebar.number_input("Start Frequency (Hz)", value=st.session_state.freq_settings["start"], step=1000.0, format="%.0f")
-stop_freq  = st.sidebar.number_input("Stop Frequency (Hz)",  value=st.session_state.freq_settings["stop"],  step=1000.0, format="%.0f")
-if start_freq != st.session_state.freq_settings["start"] or stop_freq != st.session_state.freq_settings["stop"]:
-    st.session_state.freq_settings = {"start": start_freq, "stop": stop_freq}
+    st.session_state.freq_settings = {"start": default_start, "stop": default_stop, "points": 101}
+start_khz = st.sidebar.number_input("Start Frequency (kHz)",
+                                      value=st.session_state.freq_settings["start"]/1000,
+                                      step=1.0, format="%.0f")
+stop_khz  = st.sidebar.number_input("Stop Frequency (kHz)",
+                                      value=st.session_state.freq_settings["stop"]/1000,
+                                      step=1.0, format="%.0f")
+measurement_points = st.sidebar.selectbox("Measurement Points", options=[51, 101, 145, 290], index=0)
+start_freq = start_khz * 1000
+stop_freq = stop_khz * 1000
+if (start_freq != st.session_state.freq_settings["start"] or 
+    stop_freq != st.session_state.freq_settings["stop"] or 
+    measurement_points != st.session_state.freq_settings["points"]):
+    st.session_state.freq_settings = {"start": start_freq, "stop": stop_freq, "points": measurement_points}
+    st.session_state.data_service.sa.set_frequencies(start=start_freq, stop=stop_freq, points=measurement_points)
+    if mode == "Custom Input":
+        st.session_state.data_service.sa.set_sweep(start_freq, stop_freq)
+    st.sidebar.info(f"Sweep range updated: {start_freq} Hz to {stop_freq} Hz, Points: {measurement_points}")
 
-# Remove measurement points and resolution BW from the sidebar.
-# Separate refresh rates:
-live_refresh_rate   = st.sidebar.slider("Live Display Refresh Rate (sec)", 0.5, 10.0, 1.0, 0.5)
+# Resolution Bandwidth Setting
+res_bw_option = st.sidebar.selectbox("Resolution Bandwidth", options=["Auto", "0.1", "1", "10", "100"], index=0)
+if res_bw_option == "Auto":
+    st.session_state.data_service.sa.rbw(0)
+else:
+    val = float(res_bw_option)
+    if val < 1:
+        st.session_state.data_service.sa.rbw(val)
+    else:
+        st.session_state.data_service.sa.rbw(int(val))
+    st.sidebar.info(f"RBW set to {res_bw_option}")
+
+# Separate refresh rates.
+live_refresh_rate = st.sidebar.slider("Live Display Refresh Rate (sec)", 0.5, 10.0, 1.0, 0.5)
 record_refresh_rate = st.sidebar.slider("Recorded Data Refresh Rate (sec)", 10.0, 60.0, 20.0, 1.0)
 
-# Y-axis range for live sweep plot
+# Y-axis range for live sweep plot.
 y_range = st.sidebar.slider("Y Axis Range (dBm)", -150, 0, (-120, 0), 1)
 
 # =============================================================================
@@ -115,41 +137,41 @@ with rec_col:
 # 6. Functions for Creating Figures
 # =============================================================================
 def create_live_figure(data, y_min, y_max):
-    # Dynamically generate frequency array from the current scan data length.
-    freq_vals = np.linspace(start_freq, stop_freq, len(data))
-    trace = go.Scatter(x=freq_vals, y=data, mode='lines', name='Sweep Data')
+    # Use instrument's frequency array from scan; assume it's in Hz.
+    freq_vals = st.session_state.data_service.sa.frequencies
+    # Convert to kHz for display.
+    freq_vals_khz = freq_vals / 1e3
+    trace = go.Scatter(x=freq_vals_khz, y=data, mode='lines', name='Sweep Data')
     layout = go.Layout(
         title="Live Spectrum Sweep",
-        xaxis=dict(title="Frequency (Hz)", range=[start_freq, stop_freq]),
+        xaxis=dict(title="Frequency (kHz)", range=[freq_vals[0]/1e3, freq_vals[-1]/1e3]),
         yaxis=dict(title="Magnitude (dBm)", range=[y_min, y_max]),
         paper_bgcolor='white',
         plot_bgcolor='white',
         margin=dict(l=50, r=50, t=50, b=50),
         shapes=[{
             "type": "rect",
-            "x0": start_freq, "y0": y_min,
-            "x1": stop_freq, "y1": y_max,
+            "x0": freq_vals[0]/1e3, "y0": y_min,
+            "x1": freq_vals[-1]/1e3, "y1": y_max,
             "line": {"color": "Black", "width": 2}
         }]
     )
     return go.Figure(data=[trace], layout=layout)
 
 def create_recorded_figure(file_path):
-    # Read the CSV and ignore any comment lines starting with '#'
     df = pd.read_csv(file_path, comment='#')
     time_vals = df["time"].values
-    freq_vals = np.array([float(col) for col in df.columns[1:]])
+    freq_vals = np.array([float(col)/1e3 for col in df.columns[1:]])
     z_data = df.iloc[:, 1:].values
     heatmap = go.Heatmap(x=freq_vals, y=time_vals, z=z_data, colorbar=dict(title="dBm"))
     layout = go.Layout(
         title="Recorded Sweep Data (Time vs Frequency)",
-        xaxis=dict(title="Frequency (Hz)"),
+        xaxis=dict(title="Frequency (kHz)"),
         yaxis=dict(title="Time (sec)", autorange="reversed"),
         margin=dict(l=50, r=50, t=50, b=50),
         plot_bgcolor='white'
     )
     return go.Figure(data=[heatmap], layout=layout)
-
 
 # =============================================================================
 # 7. Main Display Logic
