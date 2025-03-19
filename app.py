@@ -67,8 +67,8 @@ elif mode in ["High Input", "High Output"]:
     default_start = 240e6
     default_stop = 960e6
 elif mode in ["Custom Input"]:
-    default_start = 50e3
-    default_stop = 3.0e6
+    default_start = 10e6
+    default_stop = 100e6
 else:
     default_start = 100e3
     default_stop = 350e6
@@ -86,7 +86,24 @@ if start_freq != st.session_state.freq_settings["start"] or stop_freq != st.sess
         st.session_state.data_service.sa.set_sweep(start_freq, stop_freq)
     st.sidebar.info(f"Sweep range updated: {start_freq} Hz to {stop_freq} Hz")
 
-# Remove measurement points and resolution BW from the sidebar.
+# Add Resolution Bandwidth control as a dropdown in the sidebar
+rbw_options = ["Auto", "3 kHz", "10 kHz", "30 kHz", "100 kHz", "300 kHz", "600 kHz"]
+rbw_choice = st.sidebar.selectbox("Resolution Bandwidth (RBW)", options=rbw_options, index=0)
+
+# Convert the selected value into a numeric value for the instrument:
+if rbw_choice == "Auto":
+    rbw_value = 0.0
+else:
+    # Remove the " kHz" part and convert to Hz (multiply by 1e3)
+    rbw_value = float(rbw_choice.split()[0]) * 1e3
+
+# Check if the RBW value has changed (using session state to remember the last value)
+if 'rbw_value' not in st.session_state or st.session_state.rbw_value != rbw_value:
+    st.session_state.rbw_value = rbw_value
+    st.session_state.data_service.sa.rbw(rbw_value)
+    st.sidebar.info(f"RBW updated: {'Auto' if rbw_value == 0 else f'{rbw_value/1e3} kHz'}")
+
+
 # Separate refresh rates:
 live_refresh_rate   = st.sidebar.slider("Live Display Refresh Rate (sec)", 0.5, 10.0, 1.0, 0.5)
 record_refresh_rate = st.sidebar.slider("Recorded Data Refresh Rate (sec)", 10.0, 60.0, 20.0, 1.0)
@@ -109,9 +126,11 @@ with rec_col:
             record_duration=duration,
             dest_folder=dest_folder,
             record_interval=record_interval,
-            freq_range=(start_freq, stop_freq)
+            freq_range=(start_freq, stop_freq),
+            rbw_value=rbw_value  # Pass the RBW value from the UI
         )
         st.session_state.recording = True
+
     if st.button("Stop Recording"):
         st.session_state.data_service.stop_recording()
         st.session_state.recording = False

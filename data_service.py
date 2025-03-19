@@ -47,17 +47,30 @@ class DataService:
         with self._lock:
             return self.latest_data
 
-    def start_recording(self, record_duration=None, dest_folder="tinySA_data", record_interval=1.0, freq_range=None):
+    def start_recording(self, record_duration=None, dest_folder="tinySA_data", record_interval=1.0, freq_range=None, rbw_value=0.0):
         if not os.path.exists(dest_folder):
             os.makedirs(dest_folder)
             logging.debug(f"Created folder: {dest_folder}")
-        timestamp = time.strftime("%H%M")
-        file_name = f"sweep_{timestamp}.csv"
+
+        # Use a more detailed timestamp for uniqueness
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        
+        # Determine frequency range for filename
+        if freq_range is not None:
+            start_freq, stop_freq = freq_range
+        else:
+            start_freq, stop_freq = self.sa.frequencies[0], self.sa.frequencies[-1]
+        
+        # Format RBW label: if rbw_value is 0, label as 'Auto', else show value in kHz
+        rbw_label = "Auto" if rbw_value == 0 else f"{int(rbw_value/1e3)}kHz"
+        
+        # Construct the file name with the required information
+        file_name = f"sweep_{int(start_freq/1e6)}MHz-{int(stop_freq/1e6)}MHz_{rbw_label}_{timestamp}.csv"
         self.record_file_path = os.path.join(dest_folder, file_name)
         
-        data = self.get_latest_data()
-        if data is not None:
-            num_points = len(data)
+        # Create the frequency header line for the CSV file.
+        if self.get_latest_data() is not None:
+            num_points = len(self.get_latest_data())
         else:
             num_points = self.sa.points
         
@@ -70,7 +83,7 @@ class DataService:
         # Save metadata (frequency range) as a comment line in the CSV header.
         header = ""
         if freq_range is not None:
-            header += f"# Frequency Range: {freq_range[0]} Hz to {freq_range[1]} Hz\n"
+            header += f"# Frequency Range: {start_freq} Hz to {stop_freq} Hz\n"
         header += "time," + ",".join(freqs) + "\n"
         
         with open(self.record_file_path, "w") as f:
@@ -80,6 +93,7 @@ class DataService:
         self.recording = True
         self.record_thread = threading.Thread(target=self._record_loop, args=(record_duration, record_interval), daemon=True)
         self.record_thread.start()
+
 
     def _record_loop(self, record_duration, record_interval):
         counter = 0

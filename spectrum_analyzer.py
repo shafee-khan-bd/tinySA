@@ -6,6 +6,7 @@ import struct
 from serial.tools import list_ports
 import logging
 from PIL import Image
+import time
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -204,6 +205,10 @@ class tinySA:
             self.send_command("rbw %f\r" % data)
         else:
             self.send_command("rbw %d\r" % data)
+        if self.serial is not None:
+            time.sleep(0.1)
+            self.serial.reset_input_buffer()
+            
         
     def fetch_data(self):
         """
