@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objs as go
 from data_service import DataService
 
+st.set_page_config(layout="wide")
 # =============================================================================
 # 1. Session State Initialization
 # =============================================================================
@@ -80,6 +81,10 @@ start_freq = st.sidebar.number_input("Start Frequency (Hz)", value=st.session_st
 stop_freq  = st.sidebar.number_input("Stop Frequency (Hz)",  value=st.session_state.freq_settings["stop"],  step=1000.0, format="%.0f")
 if start_freq != st.session_state.freq_settings["start"] or stop_freq != st.session_state.freq_settings["stop"]:
     st.session_state.freq_settings = {"start": start_freq, "stop": stop_freq}
+    st.session_state.data_service.sa.set_frequencies(start=start_freq, stop=stop_freq)
+    if mode == "Custom Input":
+        st.session_state.data_service.sa.set_sweep(start_freq, stop_freq)
+    st.sidebar.info(f"Sweep range updated: {start_freq} Hz to {stop_freq} Hz")
 
 # Remove measurement points and resolution BW from the sidebar.
 # Separate refresh rates:
