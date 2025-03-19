@@ -19,6 +19,7 @@ class DataService:
         self.record_thread = None
         self._record_lock = threading.Lock()
 
+    # Continuous sweep acquisition
     def _sweep_loop(self):
         while self._running:
             try:
@@ -27,10 +28,8 @@ class DataService:
             except Exception as e:
                 logging.error(f"Error during sweep: {e}")
                 data = None
-
             with self._lock:
                 self.latest_data = data
-
             time.sleep(1)
 
     def start_sweep(self):
@@ -47,6 +46,7 @@ class DataService:
         with self._lock:
             return self.latest_data
 
+    # Recording functionality with configurable interval and duration
     def start_recording(self, record_duration=None, dest_folder="tinySA_data", record_interval=1.0, freq_range=None):
         if not os.path.exists(dest_folder):
             os.makedirs(dest_folder)
@@ -67,7 +67,7 @@ class DataService:
         else:
             freqs = [f"{int(f)}" for f in self.sa.frequencies[:num_points]]
         
-        # Save metadata (frequency range) as a comment line in the CSV header.
+        # Write metadata as a comment in the CSV header.
         header = ""
         if freq_range is not None:
             header += f"# Frequency Range: {freq_range[0]} Hz to {freq_range[1]} Hz\n"
@@ -84,8 +84,8 @@ class DataService:
     def _record_loop(self, record_duration, record_interval):
         counter = 0
         while self.recording:
-            t = counter * record_interval  # fixed time stamp based on counter and interval
-            # Force a fresh capture for each record.
+            t = counter * record_interval  # fixed timestamp based on counter and interval
+            # Force a fresh capture for each record
             data = self.sa.data(0)
             with self._lock:
                 self.latest_data = data
@@ -107,3 +107,72 @@ class DataService:
         if self.record_thread is not None:
             self.record_thread.join(timeout=5)
         logging.info("Recording stopped.")
+
+    # --- Additional instrument commands from the manufacturer ---
+
+    def set_sweep(self, start, stop):
+        self.sa.set_sweep(start, stop)
+
+    def set_span(self, span):
+        self.sa.set_span(span)
+
+    def set_center(self, center):
+        self.sa.set_center(center)
+
+    def set_level(self, level):
+        self.sa.set_level(level)
+
+    def set_output(self, on):
+        self.sa.set_output(on)
+
+    def set_low_output(self):
+        self.sa.set_low_output()
+
+    def set_low_input(self):
+        self.sa.set_low_input()
+
+    def set_high_input(self):
+        self.sa.set_high_input()
+
+    def set_frequency(self, freq):
+        self.sa.set_frequency(freq)
+
+    def measure(self, freq):
+        return self.sa.measure(freq)
+
+    def temperature(self):
+        return self.sa.temperature()
+
+    def rbw(self, value=0):
+        self.sa.rbw(value)
+
+    def resume(self):
+        self.sa.resume()
+
+    def pause(self):
+        self.sa.pause()
+
+    def marker_value(self, nr=1):
+        return self.sa.marker_value(nr)
+
+    def fetch_frequencies(self):
+        self.sa.fetch_frequencies()
+        return self.sa.frequencies
+
+    def send_scan(self, start, stop, points=None):
+        self.sa.send_scan(start, stop, points)
+
+    def scan(self):
+        return self.sa.scan()
+
+    def capture(self):
+        return self.sa.capture()
+
+    def logmag(self, x):
+        self.sa.logmag(x)
+
+    def writeCSV(self, x, name):
+        self.sa.writeCSV(x, name)
+
+    def cmd(self, text):
+        return self.sa.cmd(text)
